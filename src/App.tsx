@@ -4,13 +4,14 @@ import { AddNode } from './components/AddNode.tsx'
 import { EdgeEditor } from './components/EdgeEditor.tsx'
 import { GraphCanvas } from './components/GraphCanvas.tsx'
 import { NodeEditor } from './components/NodeEditor.tsx'
+import { PageTabs } from './components/PageTabs.tsx'
 import { SearchBox } from './components/SearchBox.tsx'
 import { Sidebar } from './components/Sidebar.tsx'
 import { VIEWS, focusTypeOf, projectGraph, showsUnconnected, type ViewId } from './graph/filters.ts'
-import { downloadText, parseProjectGraph } from './graph/io.ts'
+import { downloadText, parseProject, serializeProject } from './graph/io.ts'
 import { fitViewOptions, layoutGraph, positionBelow } from './graph/layout.ts'
-import type { ArchitectureNode } from './graph/types.ts'
-import { useProjectStore } from './store/projectStore.ts'
+import type { ArchitectureNode, ArchitecturePage } from './graph/types.ts'
+import { currentPage, currentPositions, isEmptyProject, useProjectStore } from './store/projectStore.ts'
 
 type Selection = { kind: 'node' | 'edge'; id: string } | null
 
@@ -30,18 +31,28 @@ function App() {
   const fileRef = useRef<HTMLInputElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const projectName = useProjectStore((s) => s.graph.name)
+  const projectName = useProjectStore((s) => s.project.name)
+  const pageId = useProjectStore((s) => currentPage(s).id)
   const setProjectName = useProjectStore((s) => s.setProjectName)
+  const selectPage = useProjectStore((s) => s.selectPage)
   const addNodeToStore = useProjectStore((s) => s.addNode)
   const setPositions = useProjectStore((s) => s.setPositions)
-  const replaceGraph = useProjectStore((s) => s.replaceGraph)
+  const importPages = useProjectStore((s) => s.importPages)
+  const clearProject = useProjectStore((s) => s.clearProject)
   const undo = useProjectStore((s) => s.undo)
   const redo = useProjectStore((s) => s.redo)
   const canUndo = useProjectStore((s) => s.past.length > 0)
   const canRedo = useProjectStore((s) => s.future.length > 0)
-  const isEmpty = useProjectStore((s) => s.graph.nodes.length === 0 && s.graph.edges.length === 0)
+  const isEmpty = useProjectStore((s) => isEmptyProject(s.project))
   const { getNodes, getEdges, fitView } = useReactFlow()
   const flowStore = useStoreApi()
+
+  // Page が変わったら（タブ・Undo・検索での移動・Import）、選んでいた Node / Edge の選択を解く
+  const [selectionPageId, setSelectionPageId] = useState(pageId)
+  if (selectionPageId !== pageId) {
+    setSelectionPageId(pageId)
+    setSelection(null)
+  }
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -70,12 +81,14 @@ function App() {
     setSelection(null)
   }
 
-  // 検索で選んだ Node へ移動する。今の View に表示されない Node なら、その Type の View へ切り替える
-  function jumpToNode(id: string) {
-    const graph = useProjectStore.getState().graph
-    const node = graph.nodes.find((n) => n.id === id)
-    if (!node) return
-    const visible = projectGraph(graph, view).nodes.some((n) => n.id === id)
+  // 検索で選んだ Node へ移動する。別の Page の Node なら、その Page に切り替える。
+  // 今の View に表示されない Node なら、その Type の View へ切り替える
+  function jumpToNode(targetPageId: string, id: string) {
+    const page = useProjectStore.getState().project.pages.find((p) => p.id === targetPageId)
+    const node = page?.nodes.find((n) => n.id === id)
+    if (!page || !node) return
+    selectPage(page.id)
+    const visible = projectGraph(page, view).nodes.some((n) => n.id === id)
     const target = visible ? view : (VIEWS.find((v) => v.focus === node.type)?.id ?? 'overview')
     if (target !== view) changeView(target)
     setAdding(false)
@@ -98,11 +111,13 @@ function App() {
 
   // 今の View に表示されない Type なら、追加後に Overview へ切り替えて見えるようにする
   function addNode(node: Omit<ArchitectureNode, 'id'>) {
-    const { graph, positions } = useProjectStore.getState()
+    const state = useProjectStore.getState()
+    const page = currentPage(state)
+    const positions = currentPositions(state)
     const target = showsUnconnected(view, node.type) ? view : 'overview'
     addNodeToStore(node, {
-      [target]: positionBelow(graph, positions, target),
-      overview: positionBelow(graph, positions, 'overview'),
+      [target]: positionBelow(page, positions, target),
+      overview: positionBelow(page, positions, 'overview'),
     })
     if (target !== view) changeView(target)
     requestAnimationFrame(() => fitView(fitViewOptions))
@@ -121,32 +136,40 @@ function App() {
     requestAnimationFrame(() => fitView(fitViewOptions))
   }
 
+  // すべての Page を1つのファイルに書き出す
   function exportJson() {
-    const graph = useProjectStore.getState().graph
-    downloadText(`${graph.name || 'project'}.json`, JSON.stringify(graph, null, 2), 'application/json')
+    const project = useProjectStore.getState().project
+    downloadText(`${project.name || 'project'}.json`, serializeProject(project), 'application/json')
   }
 
+  // 選んだファイル（複数可）の Page を、今の Project の後ろに足す。Page を持たないファイルは、1つの Page になる。
+  // 読めないファイルがあっても、読めたファイルは取り込む
   async function importJson(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+    const files = [...(e.target.files ?? [])]
     e.target.value = ''
-    if (!file) return
-    try {
-      const graph = parseProjectGraph(JSON.parse(await file.text()))
-      if (!confirm(`「${graph.name}」（Node ${graph.nodes.length} 件）で現在の Graph を置き換えます（Undo で戻せます）。`)) return
-      replaceGraph(graph)
-      changeView('overview')
-      requestAnimationFrame(() => fitView(fitViewOptions))
-    } catch (error) {
-      alert(`Import できませんでした: ${error instanceof Error ? error.message : String(error)}`)
+    const pages: ArchitecturePage[] = []
+    const errors: string[] = []
+    for (const file of files) {
+      try {
+        pages.push(...parseProject(JSON.parse(await file.text()), file.name.replace(/\.json$/i, '')).pages)
+      } catch (error) {
+        errors.push(`・${file.name}: ${error instanceof Error ? error.message : String(error)}`)
+      }
     }
+    if (pages.length > 0) {
+      importPages(pages)
+      changeView('overview')
+    }
+    if (errors.length > 0) alert(`Import できなかったファイルがあります:\n${errors.join('\n')}`)
   }
 
-  // Node と Edge をすべて消す。Project 名は残す
+  // すべての Page を消し、空の Page を1つ残す。Project 名は残す
   function deleteAll() {
-    const graph = useProjectStore.getState().graph
-    if (!confirm(`Node ${graph.nodes.length} 件と Edge ${graph.edges.length} 件をすべて削除します（Undo で戻せます）。`)) return
-    replaceGraph({ name: graph.name, nodes: [], edges: [] })
-    setSelection(null)
+    const { pages } = useProjectStore.getState().project
+    const nodes = pages.reduce((sum, p) => sum + p.nodes.length, 0)
+    const edges = pages.reduce((sum, p) => sum + p.edges.length, 0)
+    if (!confirm(`Page ${pages.length} 件（Node ${nodes} 件・Edge ${edges} 件）をすべて削除します（Undo で戻せます）。`)) return
+    clearProject()
   }
 
   let panel = null
@@ -179,25 +202,30 @@ function App() {
             + Add Node
           </button>
           <button onClick={exportJson}>Export JSON</button>
-          <button onClick={() => fileRef.current?.click()}>Import JSON</button>
-          <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={importJson} />
+          <button onClick={() => fileRef.current?.click()} title="選んだファイルを Page として追加する（複数選べる）">
+            Import JSON
+          </button>
+          <input ref={fileRef} type="file" accept=".json,application/json" multiple hidden onChange={importJson} />
           <button className="danger" onClick={deleteAll} disabled={isEmpty}>
             Delete All
           </button>
         </div>
       </header>
       <Sidebar view={view} onChangeView={changeView} onAutoLayout={autoLayout} />
-      <main className="canvas">
-        {/* View を切り替えたら Canvas を作り直し、その View 全体が見えるよう表示位置を合わせ直す */}
-        <GraphCanvas
-          key={view}
-          view={view}
-          flowFrom={selection?.kind === 'node' ? selection.id : null}
-          searchQuery={query}
-          focusNodeId={focusNodeId}
-          onFocused={onFocused}
-          onSelectionChange={onSelectionChange}
-        />
+      <main className="workspace">
+        <div className="canvas">
+          {/* Page や View を切り替えたら Canvas を作り直し、全体が見えるよう表示位置を合わせ直す */}
+          <GraphCanvas
+            key={`${pageId}:${view}`}
+            view={view}
+            flowFrom={selection?.kind === 'node' ? selection.id : null}
+            searchQuery={query}
+            focusNodeId={focusNodeId}
+            onFocused={onFocused}
+            onSelectionChange={onSelectionChange}
+          />
+        </div>
+        <PageTabs />
       </main>
       {panel}
     </div>

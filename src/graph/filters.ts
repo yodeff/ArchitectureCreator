@@ -1,4 +1,4 @@
-import type { ArchitectureEdge, ArchitectureNode, NodeType, ProjectGraph } from './types.ts'
+import type { ArchitectureEdge, ArchitectureGraph, ArchitectureNode, NodeType } from './types.ts'
 
 export type ViewId = 'overview' | 'requirements' | 'api' | 'usecases' | 'entities' | 'database' | 'external'
 
@@ -30,8 +30,8 @@ export function showsUnconnected(view: ViewId, type: NodeType): boolean {
   return !focus || focus === type
 }
 
-// ProjectGraph から View に表示する部分を取り出す。データは複製・保存しない
-export function projectGraph(graph: ProjectGraph, view: ViewId): GraphProjection {
+// Page の Graph から View に表示する部分を取り出す。データは複製・保存しない
+export function projectGraph(graph: ArchitectureGraph, view: ViewId): GraphProjection {
   const focus = focusTypeOf(view)
   if (!focus) {
     return { nodes: graph.nodes, edges: graph.edges, focusIds: new Set(graph.nodes.map((n) => n.id)) }

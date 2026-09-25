@@ -1,9 +1,9 @@
 import type { XYPosition } from '@xyflow/react'
 import { projectGraph, type ViewId } from './filters.ts'
 import { fieldsOf } from './nodes.ts'
-import { NODE_TYPES, type ArchitectureNode, type NodeType, type ProjectGraph } from './types.ts'
+import { NODE_TYPES, type ArchitectureGraph, type ArchitectureNode, type NodeType } from './types.ts'
 
-// 表示用の座標。ドメインデータ（ProjectGraph）とは分け、View ごとの並びを覚えておく
+// 1つの Page の表示用の座標。ドメインデータ（Project）とは分け、View ごとの並びを覚えておく
 export type Positions = Partial<Record<ViewId, Record<string, XYPosition>>>
 
 interface LayoutNode {
@@ -55,7 +55,7 @@ function defaultPositions(nodes: ArchitectureNode[]): Record<string, XYPosition>
 }
 
 // View での座標は「その View で動かした位置 → Overview の位置 → 仮の位置」の順で決める
-export function resolvePositions(graph: ProjectGraph, positions: Positions, view: ViewId): Record<string, XYPosition> {
+export function resolvePositions(graph: ArchitectureGraph, positions: Positions, view: ViewId): Record<string, XYPosition> {
   const fallback = defaultPositions(graph.nodes)
   return Object.fromEntries(
     graph.nodes.map((n) => [n.id, positions[view]?.[n.id] ?? positions.overview?.[n.id] ?? fallback[n.id]]),
@@ -63,7 +63,7 @@ export function resolvePositions(graph: ProjectGraph, positions: Positions, view
 }
 
 // 新しい Node の置き場所。既存の Node と重ならないよう、View に表示中の Node の下に置く
-export function positionBelow(graph: ProjectGraph, positions: Positions, view: ViewId): XYPosition {
+export function positionBelow(graph: ArchitectureGraph, positions: Positions, view: ViewId): XYPosition {
   const resolved = resolvePositions(graph, positions, view)
   const points = projectGraph(graph, view).nodes.map((n) => resolved[n.id])
   if (points.length === 0) return { x: 0, y: 0 }

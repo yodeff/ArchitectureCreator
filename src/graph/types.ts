@@ -53,9 +53,20 @@ export interface ArchitectureEdge {
   note?: string
 }
 
-// すべての View の元になる唯一のデータ（Single Source of Truth）
-export interface ProjectGraph {
-  name: string
+// 1つの Page の Node と Edge。View・流れの追跡・整列は、この単位で行う
+export interface ArchitectureGraph {
   nodes: ArchitectureNode[]
   edges: ArchitectureEdge[]
+}
+
+// 大きなコンポーネント（例: 注文・会員）ごとに分けた Page。Page どうしは Edge でつながない
+export interface ArchitecturePage extends ArchitectureGraph {
+  id: string
+  name: string
+}
+
+// すべての Page と View の元になる唯一のデータ（Single Source of Truth）。Page は常に1つ以上ある
+export interface Project {
+  name: string
+  pages: ArchitecturePage[]
 }

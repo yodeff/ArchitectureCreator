@@ -3,10 +3,11 @@ import {
   EDGE_KINDS,
   NODE_TYPES,
   type ArchitectureEdge,
+  type ArchitectureGraph,
   type ArchitectureNode,
   type EdgeKind,
   type NodeType,
-  type ProjectGraph,
+  type Project,
 } from './types.ts'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -42,21 +43,21 @@ function legacyApiName(n: Record<string, unknown>): string {
   return isRecord(api) && typeof api.method === 'string' && typeof api.path === 'string' ? `${api.method} ${api.path}` : ''
 }
 
-// Import した JSON や、以前の形式で保存したデータを検証して ProjectGraph にする。
-// 形が壊れているときだけ Error を投げ、以前の形式の違い（種類・属性・関係）は読み替える
-export function parseProjectGraph(value: unknown): ProjectGraph {
+// 1つの Page の Node と Edge を検証する。形が壊れているときだけ Error を投げ、以前の形式の違い（種類・属性・関係）は読み替える。
+// at: エラーの場所を示す前置き（例: pages[1].）
+function parseGraph(value: unknown, at: string): ArchitectureGraph {
   if (!isRecord(value) || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
-    throw new Error('nodes と edges の配列が必要です')
+    throw new Error(`${at}nodes と edges の配列が必要です`)
   }
 
   const ids = new Set<string>()
   const nodes: ArchitectureNode[] = value.nodes.map((n: unknown, i) => {
     if (!isRecord(n) || typeof n.id !== 'string' || typeof n.name !== 'string') {
-      throw new Error(`nodes[${i}] に id と name（文字列）が必要です`)
+      throw new Error(`${at}nodes[${i}] に id と name（文字列）が必要です`)
     }
     const type = parseType(n.type)
-    if (!type) throw new Error(`nodes[${i}] の type が不正です: ${String(n.type)}`)
-    if (ids.has(n.id)) throw new Error(`Node の id が重複しています: ${n.id}`)
+    if (!type) throw new Error(`${at}nodes[${i}] の type が不正です: ${String(n.type)}`)
+    if (ids.has(n.id)) throw new Error(`${at}Node の id が重複しています: ${n.id}`)
     ids.add(n.id)
     return keepTypeAttributes({
       id: n.id,
@@ -69,10 +70,10 @@ export function parseProjectGraph(value: unknown): ProjectGraph {
 
   const edges: ArchitectureEdge[] = value.edges.map((e: unknown, i) => {
     if (!isRecord(e) || typeof e.id !== 'string' || typeof e.source !== 'string' || typeof e.target !== 'string') {
-      throw new Error(`edges[${i}] に id・source・target（文字列）が必要です`)
+      throw new Error(`${at}edges[${i}] に id・source・target（文字列）が必要です`)
     }
     if (!ids.has(e.source) || !ids.has(e.target)) {
-      throw new Error(`edges[${i}] が存在しない Node を参照しています`)
+      throw new Error(`${at}edges[${i}] が存在しない Node を参照しています`)
     }
     // 以前の形式は、関係を自由入力のラベル（label）で持っていた。reads / writes 以外は補足として残す
     const kind = [e.kind, e.label].find(isEdgeKind)
@@ -80,7 +81,33 @@ export function parseProjectGraph(value: unknown): ProjectGraph {
     return { id: e.id, source: e.source, target: e.target, kind, note }
   })
 
-  return { name: typeof value.name === 'string' ? value.name : 'Imported Project', nodes, edges }
+  return { nodes, edges }
+}
+
+// Import した JSON や、以前の形式で保存したデータを検証して Project にする。
+// Page を持たない形式（Page を入れる前の書き出し）は、1つの Page として読む。
+// Page の id は読み込むたびに作り直す（同じファイルを2回 Import しても重ならないように）。
+// fallbackName: 名前を持たないときに使う名前（ファイル名など）
+export function parseProject(value: unknown, fallbackName: string): Project {
+  if (!isRecord(value)) throw new Error('JSON のオブジェクトが必要です')
+  const name = optionalString(value.name) ?? fallbackName
+
+  if (!Array.isArray(value.pages)) {
+    return { name, pages: [{ id: crypto.randomUUID(), name, ...parseGraph(value, '') }] }
+  }
+  if (value.pages.length === 0) throw new Error('pages が空です')
+  const pages = value.pages.map((page: unknown, i) => ({
+    id: crypto.randomUUID(),
+    name: (isRecord(page) && optionalString(page.name)) || `Page ${i + 1}`,
+    ...parseGraph(page, `pages[${i}].`),
+  }))
+  return { name, pages }
+}
+
+// Export する JSON。Page の id は Import のたびに作り直すので書き出さない
+export function serializeProject(project: Project): string {
+  const pages = project.pages.map(({ name, nodes, edges }) => ({ name, nodes, edges }))
+  return JSON.stringify({ name: project.name, pages }, null, 2)
 }
 
 export function downloadText(filename: string, text: string, type: string) {

@@ -1,10 +1,10 @@
 import { nodeTitle } from '../graph/nodes.ts'
 import { EDGE_KINDS, EDGE_KIND_LABELS, type EdgeKind } from '../graph/types.ts'
-import { mergeKeyOf, useProjectStore } from '../store/projectStore.ts'
+import { currentPage, mergeKeyOf, useProjectStore } from '../store/projectStore.ts'
 
 export function EdgeEditor({ edgeId }: { edgeId: string }) {
-  const edge = useProjectStore((s) => s.graph.edges.find((e) => e.id === edgeId))
-  const nodes = useProjectStore((s) => s.graph.nodes)
+  const edge = useProjectStore((s) => currentPage(s).edges.find((e) => e.id === edgeId))
+  const nodes = useProjectStore((s) => currentPage(s).nodes)
   const updateEdge = useProjectStore((s) => s.updateEdge)
   const deleteElements = useProjectStore((s) => s.deleteElements)
   if (!edge) return null

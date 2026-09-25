@@ -1,9 +1,9 @@
 import { TYPES_WITH_FIELDS } from '../graph/types.ts'
-import { mergeKeyOf, useProjectStore } from '../store/projectStore.ts'
+import { currentPage, mergeKeyOf, useProjectStore } from '../store/projectStore.ts'
 import { TypeSelect } from './TypeSelect.tsx'
 
 export function NodeEditor({ nodeId }: { nodeId: string }) {
-  const node = useProjectStore((s) => s.graph.nodes.find((n) => n.id === nodeId))
+  const node = useProjectStore((s) => currentPage(s).nodes.find((n) => n.id === nodeId))
   const updateNode = useProjectStore((s) => s.updateNode)
   const deleteElements = useProjectStore((s) => s.deleteElements)
   if (!node) return null

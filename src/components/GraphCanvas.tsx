@@ -25,7 +25,7 @@ import { traceFlow } from '../graph/flow.ts'
 import { fitViewOptions, resolvePositions } from '../graph/layout.ts'
 import { fieldsOf, searchNodes } from '../graph/nodes.ts'
 import { EDGE_COLORS, EDGE_KIND_LABELS, NODE_TYPE_INFO, type ArchitectureEdge, type ArchitectureNode } from '../graph/types.ts'
-import { useProjectStore } from '../store/projectStore.ts'
+import { currentPage, currentPositions, useProjectStore } from '../store/projectStore.ts'
 import { Legend } from './Legend.tsx'
 
 // faded: 選んだ Node を通る流れに含まれない（流れのハイライト中だけ）
@@ -85,8 +85,9 @@ interface Props {
 }
 
 export function GraphCanvas({ view, flowFrom, searchQuery, focusNodeId, onFocused, onSelectionChange }: Props) {
-  const graph = useProjectStore((s) => s.graph)
-  const positions = useProjectStore((s) => s.positions)
+  // 表示中の Page。Page を切り替えると App が Canvas を作り直す
+  const graph = useProjectStore(currentPage)
+  const positions = useProjectStore(currentPositions)
   const addEdge = useProjectStore((s) => s.addEdge)
   const deleteElements = useProjectStore((s) => s.deleteElements)
   const setPositions = useProjectStore((s) => s.setPositions)

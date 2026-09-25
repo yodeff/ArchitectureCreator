@@ -1,4 +1,4 @@
-import type { ProjectGraph } from './types.ts'
+import type { ArchitectureGraph } from './types.ts'
 
 export interface Flow {
   nodeIds: Set<string>
@@ -6,7 +6,7 @@ export interface Flow {
 }
 
 // 選んだ Node を通る流れ。矢印をさかのぼった上流（要件・入口の側）と、たどった下流（データ・外部の側）を集める
-export function traceFlow(graph: ProjectGraph, startId: string): Flow {
+export function traceFlow(graph: ArchitectureGraph, startId: string): Flow {
   const nodeIds = new Set([startId])
   const edgeIds = new Set<string>()
 

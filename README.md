@@ -18,6 +18,7 @@ npm run lint     # oxlint
   - Node の種類と層: Requirement（層の外）・API（Interface Adapters: Controller）・UseCase（Use Cases: Interactor）・Entity（Entities）・Database / External（Frameworks & Drivers: Repository / Gateway の実装）
   - 矢印は「使う側 → 使われる側」。データを読む・書く線は、Edge のパネルで「読む」「書く」にすると色が変わる（Canvas 右上の「凡例」）
 - Node / Edge をクリックすると右のパネルで編集・削除できる（Delete / Backspace キーでも削除できる）。Entity と Database は項目名を書ける
+- **Delete All** で Node と Edge をすべて削除する（Project 名は残る。Undo で戻せる）
 - Node を選ぶと、その Node を通る流れ（矢印をさかのぼった上流と、たどった下流）を強調する。UseCase を選べば、その機能で使うものが分かる
 - **Undo / Redo**（Ctrl+Z / Ctrl+Shift+Z・Ctrl+Y）で編集・移動・整列・Import を戻せる。文字の入力は欄ごとにまとめて戻る
 - 上の検索欄（Ctrl+K）で、名前・説明・項目名から Node を探す。一致した Node は Canvas とミニマップで強調され、選ぶとその Node へ移動する

@@ -1,0 +1,5 @@
+node_modules
+# 書き出した動画（npm run render）
+out
+# 録画中の一時ファイル
+recording-frames

@@ -39,6 +39,7 @@ function App() {
   const redo = useProjectStore((s) => s.redo)
   const canUndo = useProjectStore((s) => s.past.length > 0)
   const canRedo = useProjectStore((s) => s.future.length > 0)
+  const isEmpty = useProjectStore((s) => s.graph.nodes.length === 0 && s.graph.edges.length === 0)
   const { getNodes, getEdges, fitView } = useReactFlow()
   const flowStore = useStoreApi()
 
@@ -140,6 +141,14 @@ function App() {
     }
   }
 
+  // Node と Edge をすべて消す。Project 名は残す
+  function deleteAll() {
+    const graph = useProjectStore.getState().graph
+    if (!confirm(`Node ${graph.nodes.length} 件と Edge ${graph.edges.length} 件をすべて削除します（Undo で戻せます）。`)) return
+    replaceGraph({ name: graph.name, nodes: [], edges: [] })
+    setSelection(null)
+  }
+
   let panel = null
   if (adding) {
     panel = <AddNode initialType={focusTypeOf(view) ?? 'requirement'} onAdd={addNode} onClose={() => setAdding(false)} />
@@ -172,6 +181,9 @@ function App() {
           <button onClick={exportJson}>Export JSON</button>
           <button onClick={() => fileRef.current?.click()}>Import JSON</button>
           <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={importJson} />
+          <button className="danger" onClick={deleteAll} disabled={isEmpty}>
+            Delete All
+          </button>
         </div>
       </header>
       <Sidebar view={view} onChangeView={changeView} onAutoLayout={autoLayout} />

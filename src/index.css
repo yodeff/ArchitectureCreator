@@ -409,36 +409,6 @@ textarea.code {
   color: var(--muted);
 }
 
-/* Export for AI */
-
-.dialog {
-  width: min(760px, calc(100vw - 32px));
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.dialog::backdrop {
-  background: rgb(0 0 0 / 0.3);
-}
-
-.dialog h2 {
-  margin: 0 0 4px;
-  font-size: 16px;
-}
-
-.dialog-note {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.dialog textarea {
-  height: min(60vh, 520px);
-  margin-bottom: 10px;
-  resize: none;
-}
-
 /* Narrow screens: views become a row above the canvas, the panel goes below it */
 
 @media (max-width: 720px) {

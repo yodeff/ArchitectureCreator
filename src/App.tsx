@@ -1,7 +1,6 @@
 import { useReactFlow, useStoreApi, type OnSelectionChangeFunc } from '@xyflow/react'
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { AddNode } from './components/AddNode.tsx'
-import { AgentExportDialog } from './components/AgentExportDialog.tsx'
 import { EdgeEditor } from './components/EdgeEditor.tsx'
 import { GraphCanvas } from './components/GraphCanvas.tsx'
 import { NodeEditor } from './components/NodeEditor.tsx'
@@ -26,7 +25,6 @@ function App() {
   const [view, setView] = useState<ViewId>('overview')
   const [selection, setSelection] = useState<Selection>(null)
   const [adding, setAdding] = useState(false)
-  const [exporting, setExporting] = useState(false)
   const [query, setQuery] = useState('')
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -171,7 +169,6 @@ function App() {
           <button className="primary" onClick={openAddNode}>
             + Add Node
           </button>
-          <button onClick={() => setExporting(true)}>Export for AI</button>
           <button onClick={exportJson}>Export JSON</button>
           <button onClick={() => fileRef.current?.click()}>Import JSON</button>
           <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={importJson} />
@@ -191,7 +188,6 @@ function App() {
         />
       </main>
       {panel}
-      {exporting && <AgentExportDialog onClose={() => setExporting(false)} />}
     </div>
   )
 }
